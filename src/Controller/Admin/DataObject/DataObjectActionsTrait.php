@@ -259,6 +259,26 @@ trait DataObjectActionsTrait
                     $brick->setObjectVar($brickKey, $value);
                 }
             } else {
+                //<<<ScopPatch
+                $fieldDefinition = $this->getFieldDefinition($class, $key);
+                if ($fieldDefinition instanceof DataObject\ClassDefinition\Data\Block) {
+                    $fields = $fieldDefinition->getFieldDefinitions();
+                    $fieldTypes = [];
+                    foreach ($fields as $fieldName => $field) {
+                        $fieldTypes[$fieldName] = $field->getFieldType();
+                    }
+
+                    foreach($value as $index => $item) {
+                        if (is_array($item) && isset($item['data'])) {
+                            $blockData = $item['data'];
+                            foreach ($blockData as $fieldName => $fieldValue) {
+                                $blockData[$fieldName] = new DataObject\Data\BlockElement($fieldName, $fieldTypes[$fieldName], $fieldValue);
+                            }
+                            $value[$index] = $blockData;
+                        }
+                    }
+                }
+                //ScopPatch>>>
                 if ($languagePermissions) {
                     $fd = $class->getFieldDefinition($key);
                     if (!$fd) {

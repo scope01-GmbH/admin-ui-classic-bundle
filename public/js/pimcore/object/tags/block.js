@@ -35,15 +35,54 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
         Ext.apply(this.fieldConfig, fieldConfig);
     },
 
-    getGridColumnConfig: function(field) {
-        return {text: t(field.label), width: 150, sortable: false, dataIndex: field.key,
-            renderer: function (key, value, metaData, record) {
-                this.applyPermissionStyle(key, value, metaData, record);
-
-                return t("not_supported");
-            }.bind(this, field.key)};
+    //<<<ScopPatch
+    getCellEditValue: function () {
+        return this.getValue();
     },
 
+    getGridColumnConfig: function(field) {
+        return {
+            text: t(field.label),
+            width: 400,
+            minWidth: 400,
+            sortable: false,
+            dataIndex: field.key,
+            renderer: function (key, value, metaData, record) {
+                this.applyPermissionStyle(key, value, metaData, record);
+                if (typeof record.data.data === 'undefined') {
+                    record.data.data = Ext.clone(record.data);
+                }
+                if (typeof record.data.metaData === "undefined") {
+                    record.data.metaData = metaData;
+                }
+                var tempEl = Ext.getBody().createChild({
+                    tag: 'div',
+                    style: 'display:none;', // verhindert Anzeige
+                });
+                value = Ext.clone(value);
+                const fieldInfo = Ext.clone(field);
+                fieldInfo.layout.optimizedAdminLoading = false;
+                const tag = new pimcore.object.tags.block(value, fieldInfo.layout);
+                const object = Ext.clone(record);
+                tag.setObject(object);
+                tag.updateContext({
+                    objectId: object.id
+                });
+
+                tag.fieldConfig.datatype ="layout";
+                tag.fieldConfig.fieldtype = "panel"
+                tag.fieldConfig.target = "grid";
+                tag.component = Ext.create('Ext.container.Container', {});//new Ext.Panel();
+                tag.initData();
+                tag.component.render(tempEl);
+                let html = tempEl.dom.innerHTML;
+                tempEl.destroy();
+                return html;
+            }.bind(this, field.key),
+            getEditor: this.getWindowCellEditor.bind(this, field)
+        };
+    },
+    //ScopPatch>>>
 
     getLayoutEdit: function () {
         this.fieldConfig.datatype ="layout";
@@ -64,9 +103,11 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
         this.component = new Ext.Panel(panelConf);
 
         this.component.addListener("render", function() {
-            if(this.object.data.metaData[this.getName()] && this.object.data.metaData[this.getName()].hasParentValue) {
+            //<<<ScopPatch
+            if(this.object.data.metaData && this.object.data.metaData[this.getName()] && this.object.data.metaData[this.getName()].hasParentValue) {
                 this.addInheritanceSourceButton(this.object.data.metaData[this.getName()]);
             }
+            //ScopPatch>>>
         }.bind(this));
 
         this.initData();
@@ -75,9 +116,12 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
     },
 
     initData: function () {
-
         if(this.data.length < 1) {
-            this.component.add(this.getControls());
+//<<<ScopPatch
+            if (this.fieldConfig.target !== 'grid') {
+                this.component.add(this.getControls());
+            }
+//ScopPatch>>>
         } else {
             Ext.suspendLayouts();
             for (var i=0; i<this.data.length; i++) {
@@ -275,23 +319,49 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
 
         items = items.items;
 
-        var blockElement = new Ext.Panel({
-            pimcore_oIndex: oIndex,
-            bodyStyle: "padding:10px;",
-            style: "margin: 10px 0 10px 0;"  + this.fieldConfig.styleElement,
-            manageHeight: false,
-            border: false,
-            items: [
-                {
-                    xtype: 'panel',
-                    style: "margin: 10px 0 10px 0;",
-                    items: items
-                }
-            ],
-            disabled: this.fieldConfig.noteditable
-        });
+        //<<<ScopPatch
+        var blockElement;
+        if (this.fieldConfig.target === 'grid') {
+            let bodyStyle = index > 0 ? {
+                'border-top': '1px solid #aaaaaa',
+            } : {
+                'border-top': 'none',
+            };
+            blockElement = new Ext.container.Container({
+                pimcore_oIndex: oIndex,
+                style: bodyStyle,
+                manageHeight: false,
+                border: true,
+                items: items,
+                disabled: this.fieldConfig.noteditable
+            });
+            blockElement.query('field').forEach(function(field) {
+                field.setReadOnly(true);
+                field.on('afterrender', function() {
+                    field.getEl().setStyle('pointer-events', 'none');
+                    field.getEl().setStyle('margin-bottom', 0);
+                });
+            });
+        } else {
+            blockElement = new Ext.Panel({
+                pimcore_oIndex: oIndex,
+                bodyStyle: "padding:10px;",
+                style: "margin: 10px 0 10px 0;"  + this.fieldConfig.styleElement,
+                manageHeight: false,
+                border: false,
+                items: [
+                    {
+                        xtype: 'panel',
+                        style: "margin: 10px 0 10px 0;",
+                        items: items
+                    }
+                ],
+                disabled: this.fieldConfig.noteditable
+            });
 
-        blockElement.insert(0, this.getControls(blockElement));
+            blockElement.insert(0, this.getControls(blockElement));
+        }
+        //ScopPatch>>>
 
         blockElement.key = this.currentElements.length;
         // blockElement.fieldtype = type;
