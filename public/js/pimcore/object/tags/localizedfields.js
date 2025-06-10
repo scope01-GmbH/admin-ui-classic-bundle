@@ -79,6 +79,12 @@ pimcore.object.tags.localizedfields = Class.create(pimcore.object.tags.abstract,
     },
 
     getLayoutEdit: function (showMode) {
+        //<<<ScopPatch
+        if (this.context.gridLanguage) {
+            this.frontendLanguages = [this.context.gridLanguage];
+        }
+        //ScopPatch>>>
+
         this.fieldConfig.datatype = "layout";
         this.fieldConfig.fieldtype = "panel";
 

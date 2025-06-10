@@ -327,6 +327,12 @@ pimcore.object.helpers.edit = {
                     l.title += ' ' + icons;
                 }
 
+                //<<<ScopPatch
+                if (context.gridLanguage) {
+                    l.gridLanguage = context.gridLanguage;
+                }
+                //ScopPatch>>>
+
                 var field = new pimcore.object.tags[l.fieldtype](data, l);
 
                 let applyDefaults = false;

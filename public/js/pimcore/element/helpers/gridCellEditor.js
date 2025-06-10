@@ -80,6 +80,14 @@ Ext.define('pimcore.element.helpers.gridCellEditor', {
             fieldname: fieldInfo.key
         });
 
+        //<<<ScopPatch
+        if (typeof fieldInfo.gridLanguage !== "undefined" && fieldInfo.gridLanguage) {
+            tag.updateContext({
+                gridLanguage: fieldInfo.gridLanguage
+            });
+        }
+        //ScopPatch>>>
+
         if (typeof tag["finishSetup"] !== "undefined") {
             tag.finishSetup();
         }
@@ -94,13 +102,21 @@ Ext.define('pimcore.element.helpers.gridCellEditor', {
         if (tagType === 'manyToManyObjectRelation' && fieldInfo.layout.width && fieldInfo.layout.width !== '100%') {
             width = sumWidths(fieldInfo.layout.width, 25);
         }
+
+        //<<<ScopPatch
+        const viewportHeight = Ext.Element.getViewportHeight();
+        const windowHeight = 600;
+        const top = Math.max(10, viewportHeight - windowHeight);
+
         this.editWin = new Ext.Window({
             modal: false,
             title: t("edit") + " " + fieldInfo.layout.title,
             items: [formPanel],
             bodyStyle: "background: #fff;",
             width: width,
-            maxHeight: 600,
+            maxHeight: windowHeight,
+            y: top,
+            //ScopPatch>>>
             autoScroll: true,
             preventRefocus: true,      // nasty hack because this is an internal property
                                        // for html grid cell values with hrefs this prevents that the cell
@@ -138,8 +154,6 @@ Ext.define('pimcore.element.helpers.gridCellEditor', {
         });
         this.editWin.show();
         this.editWin.updateLayout();
-
-
     },
 
     getValue: function() {

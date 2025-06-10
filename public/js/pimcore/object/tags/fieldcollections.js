@@ -44,50 +44,113 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         this.toolbar = toolbar;
     },
 
+    //<<<ScopPatch
+    getCellEditValue: function () {
+        return this.getValue();
+    },
+
     getGridColumnConfig: function(field) {
-        return {text: t(field.label), width: 150, sortable: false, dataIndex: field.key,
-                renderer: function (key, value, metaData, record) {
-                    this.applyPermissionStyle(key, value, metaData, record);
-                    if(typeof record.data[key] === 'string') {
-                        return record.data[key];
-                    }
+        return {
+            text: t(field.label),
+            width: 300,
+            sortable: false,
+            dataIndex: field.key,
+            getEditor: this.getWindowCellEditor.bind(this, field),
+            renderer: function (key, value, metaData, record, rowIdex, colIdex, grid, window) {
+                if (!value) {
+                    return '';
+                }
+                field.gridLanguage = grid.config.proxy.extraParams.language;
+                this.applyPermissionStyle(key, value, metaData, record);
+                if (typeof record.data.data === 'undefined') {
+                    record.data.data = Ext.clone(record.data);
+                }
+                if (typeof record.data.general === 'undefined') {
+                    record.data.general = record.data.data;
+                }
+                if (typeof record.data.metaData === "undefined") {
+                    record.data.metaData = metaData;
+                }
+                record.getSaveData = () => {
+                    let saveData = {};
+                    saveData.data = {key: record.data.data[key]};
+                    saveData.data = Ext.encode(saveData.data);
+                    return saveData;
+                }
 
-                    let preview = '';
-                    let plainText = false;
-                    let fieldCollectionItems = record.data[key];
-
-                    if (typeof record.data.preview !== 'undefined'){
-                        fieldCollectionItems = record.data.preview;
-                        plainText = true;
-                    }
-
-                    let previousFieldCollectionItemType = null;
-                    for (let fieldCollectionItem of fieldCollectionItems) {
-
-                        if (plainText) {
-                            preview += this.generatePlainTextPreview(fieldCollectionItem);
-                        } else {
-                            if (previousFieldCollectionItemType !== fieldCollectionItem.type) {
-                                preview += `<h3 style="margin-top: 0">${t(fieldCollectionItem.type)}</h3>`;
-                                previousFieldCollectionItemType = fieldCollectionItem.type;
+                for (let item of value) {
+                    if (typeof item.data !== 'undefined') {
+                        for (let k in item.data) {
+                            if (typeof item.data[k].value !== 'undefined') {
+                                let childValue = item.data[k].value;
+                                item.data[k] = childValue;
                             }
-
-                            preview += `<div style="margin-bottom: 10px; border-bottom: 1px solid #e9e9e9; overflow: auto; white-space: normal">`;
-                            for (let fieldKey in fieldCollectionItem.data) {
-                                if (!fieldCollectionItem.data.hasOwnProperty(fieldKey)) {
-                                    continue;
-                                }
-
-                                preview += `<div style=""><b>${t(fieldCollectionItem.data[fieldKey].title)}:</b></div>`;
-                                preview += `<div style="margin-bottom: 5px">${fieldCollectionItem.data[fieldKey].value ? fieldCollectionItem.data[fieldKey].value : '-'}</div>`;
-                            }
-                            preview += `</div>`;
                         }
                     }
+                }
+                record.data.data[key] = value;
 
-                    return preview;
-                }.bind(this, field.key)};
+                let childrenFildDef = [];
+                for (const childKey in this.fieldConfig.children) {
+                    if (childKey === 'localizedfields') {
+                        for (const locChildKey in this.fieldConfig.children[childKey]) {
+                            childrenFildDef.push(this.fieldConfig.children[childKey][locChildKey]);
+                        }
+                    } else {
+                        childrenFildDef.push(this.fieldConfig.children[childKey]);
+                    }
+                }
+
+                let layoutForGrid = {
+                    datatype: "layout",
+                    name: field.name,
+                    fieldtype: "fieldcollections",
+                    children: childrenFildDef,
+                };
+
+                this.setObject(record);
+                this.updateContext({
+                    objectId: record.id
+                });
+
+                let html = '<div class="grid-cell-block"><hr>';
+                for (var i= 0; i < value.length; i++) {
+                    let type = value[i].type;
+                    this.currentData = value[i].data;
+                    var items = this.getRecursiveLayout(
+                        layoutForGrid,
+                        true,
+                        {
+                            target: 'grid',
+                            containerType: "fieldcollection",
+                            containerName: this.fieldConfig.name,
+                            containerKey: type,
+                            index: i,
+                            applyDefaults: true,
+                            gridLanguage: field.gridLanguage,
+                        },
+                        undefined, undefined, undefined, true);
+                    items = items.items;
+                    if (Array.isArray(items)) {
+                        for (const item of items) {
+                            try {
+                                var rawLabel = item.getFieldLabel();
+                                var plainLabel = rawLabel ? rawLabel.replace(/<\/?[^>]+(>|$)/g, "") : '';
+                                html += '<strong>' + plainLabel + '</strong> : ' + item.getRawValue() + '<br>';
+                            } catch (e) {
+                                console.error(e);
+                            }
+                        }
+                    }
+                    html += '<hr>';
+                }
+                html += '</div>';
+                return html;
+            }.bind(this, field.key)
+        };
     },
+    //ScopPatch>>>
+
     generatePlainTextPreview: function (fieldCollectionItem) {
         let preview = `<b>${t(fieldCollectionItem.type)}</b> - `;
         for (let fieldKey in fieldCollectionItem.data) {
@@ -469,6 +532,9 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 containerKey: type,
                 index: index,
                 applyDefaults: true,
+                //<<<ScopPatch
+                gridLanguage: this.context?.gridLanguage ?? null,
+                //ScopPatch>>>
             },
             false,
             false,

@@ -22,6 +22,7 @@ use Pimcore\Bundle\AdminBundle\Service\GridData;
 use Pimcore\Localization\LocaleServiceInterface;
 use Pimcore\Logger;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\Fieldcollection;
 use Pimcore\Tool;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpFoundation\Request;
@@ -276,6 +277,39 @@ trait DataObjectActionsTrait
                             }
                             $value[$index] = $blockData;
                         }
+                    }
+                }
+                if ($fieldDefinition instanceof DataObject\ClassDefinition\Data\Fieldcollections) {
+                    if (is_array($value)) {
+                        $fieldCollectionItems = new Fieldcollection();
+                        foreach ($value as $index => $item) {
+                            if (isset($item['type'])) {
+                                $type = 'Pimcore\\Model\\DataObject\\Fieldcollection\\Data\\' . $item['type'];
+                                if (class_exists($type)) {
+                                    $collectionItem = new $type();
+                                    $itemData = $item['data'] ?? [];
+                                    foreach ($itemData as $fieldName => $fieldValue) {
+                                        if ($fieldName === 'localizedfields') {
+                                            foreach ($fieldValue as $lang => $localizedValues) {
+                                                foreach ($localizedValues as $localizedKey => $localizedValue) {
+                                                    $setter = 'set' . ucfirst($localizedKey);
+                                                    if (method_exists($collectionItem, $setter)) {
+                                                        $collectionItem->$setter($localizedValue, $lang);
+                                                    }
+                                                }
+                                            }
+                                            continue;
+                                        }
+                                        $setter = 'set' . ucfirst($fieldName);
+                                        if (method_exists($collectionItem, $setter)) {
+                                            $collectionItem->$setter($fieldValue);
+                                        }
+                                    }
+                                    $fieldCollectionItems->add($collectionItem);
+                                }
+                            }
+                        }
+                        $value = $fieldCollectionItems;
                     }
                 }
                 //ScopPatch>>>

@@ -43,8 +43,7 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
     getGridColumnConfig: function(field) {
         return {
             text: t(field.label),
-            width: 400,
-            minWidth: 400,
+            width: 300,
             sortable: false,
             dataIndex: field.key,
             renderer: function (key, value, metaData, record) {
@@ -52,31 +51,63 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
                 if (typeof record.data.data === 'undefined') {
                     record.data.data = Ext.clone(record.data);
                 }
+                if (typeof record.data.general === 'undefined') {
+                    record.data.general = record.data.data;
+                }
                 if (typeof record.data.metaData === "undefined") {
                     record.data.metaData = metaData;
                 }
-                var tempEl = Ext.getBody().createChild({
-                    tag: 'div',
-                    style: 'display:none;', // verhindert Anzeige
-                });
-                value = Ext.clone(value);
-                const fieldInfo = Ext.clone(field);
-                fieldInfo.layout.optimizedAdminLoading = false;
-                const tag = new pimcore.object.tags.block(value, fieldInfo.layout);
-                const object = Ext.clone(record);
-                tag.setObject(object);
-                tag.updateContext({
-                    objectId: object.id
+                record.getSaveData = () => {
+                    let saveData = {};
+                    saveData.data = {key: record.data.data[key]};
+                    saveData.data = Ext.encode(saveData.data);
+                    return saveData;
+                }
+
+                this.setObject(record);
+                this.updateContext({
+                    objectId: record.id
                 });
 
-                tag.fieldConfig.datatype ="layout";
-                tag.fieldConfig.fieldtype = "panel"
-                tag.fieldConfig.target = "grid";
-                tag.component = Ext.create('Ext.container.Container', {});//new Ext.Panel();
-                tag.initData();
-                tag.component.render(tempEl);
-                let html = tempEl.dom.innerHTML;
-                tempEl.destroy();
+                let layoutForGrid = {
+                    datatype: "layout",
+                    name: field.name,
+                    fieldtype: "block",
+                    children: this.fieldConfig.children,
+                };
+                let html = '<div class="grid-cell-block"><hr>';
+                for (var i= 0; i < value.length; i++) {
+                    this.currentData = value[i].data;
+                    var context = this.getContext();
+                    context["subContainerType"] = "block";
+                    context["subContainerKey"] = field.name;
+                    context["applyDefaults"] = true;
+                    var items = this.getRecursiveLayout(
+                        layoutForGrid,
+                        true,
+                        {
+                            target: 'grid',
+                            subContainerType: "block",
+                            subContainerKey: field.name,
+                            applyDefaults: true,
+                            gridLanguage: field.gridLanguage,
+                        },
+                        undefined, undefined, undefined, true);
+                    items = items.items;
+                    if (Array.isArray(items)) {
+                        for (const item of items) {
+                            try {
+                                var rawLabel = item.getFieldLabel();
+                                var plainLabel = rawLabel ? rawLabel.replace(/<\/?[^>]+(>|$)/g, "") : '';
+                                html += '<strong>' + plainLabel + '</strong> : ' + item.getRawValue() + '<br>';
+                            } catch (e) {
+                                console.error(e);
+                            }
+                        }
+                    }
+                    html += '<hr>';
+                }
+                html += '</div>';
                 return html;
             }.bind(this, field.key),
             getEditor: this.getWindowCellEditor.bind(this, field)
@@ -103,11 +134,9 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
         this.component = new Ext.Panel(panelConf);
 
         this.component.addListener("render", function() {
-            //<<<ScopPatch
-            if(this.object.data.metaData && this.object.data.metaData[this.getName()] && this.object.data.metaData[this.getName()].hasParentValue) {
+            if(this.object.data.metaData[this.getName()] && this.object.data.metaData[this.getName()].hasParentValue) {
                 this.addInheritanceSourceButton(this.object.data.metaData[this.getName()]);
             }
-            //ScopPatch>>>
         }.bind(this));
 
         this.initData();
@@ -117,11 +146,7 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
 
     initData: function () {
         if(this.data.length < 1) {
-//<<<ScopPatch
-            if (this.fieldConfig.target !== 'grid') {
-                this.component.add(this.getControls());
-            }
-//ScopPatch>>>
+            this.component.add(this.getControls());
         } else {
             Ext.suspendLayouts();
             for (var i=0; i<this.data.length; i++) {
@@ -319,31 +344,7 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
 
         items = items.items;
 
-        //<<<ScopPatch
-        var blockElement;
-        if (this.fieldConfig.target === 'grid') {
-            let bodyStyle = index > 0 ? {
-                'border-top': '1px solid #aaaaaa',
-            } : {
-                'border-top': 'none',
-            };
-            blockElement = new Ext.container.Container({
-                pimcore_oIndex: oIndex,
-                style: bodyStyle,
-                manageHeight: false,
-                border: true,
-                items: items,
-                disabled: this.fieldConfig.noteditable
-            });
-            blockElement.query('field').forEach(function(field) {
-                field.setReadOnly(true);
-                field.on('afterrender', function() {
-                    field.getEl().setStyle('pointer-events', 'none');
-                    field.getEl().setStyle('margin-bottom', 0);
-                });
-            });
-        } else {
-            blockElement = new Ext.Panel({
+        var blockElement = new Ext.Panel({
                 pimcore_oIndex: oIndex,
                 bodyStyle: "padding:10px;",
                 style: "margin: 10px 0 10px 0;"  + this.fieldConfig.styleElement,
@@ -359,9 +360,7 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
                 disabled: this.fieldConfig.noteditable
             });
 
-            blockElement.insert(0, this.getControls(blockElement));
-        }
-        //ScopPatch>>>
+        blockElement.insert(0, this.getControls(blockElement));
 
         blockElement.key = this.currentElements.length;
         // blockElement.fieldtype = type;

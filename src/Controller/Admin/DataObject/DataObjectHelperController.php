@@ -1104,6 +1104,30 @@ class DataObjectHelperController extends AdminAbstractController
             }
             DataObject\Service::enrichLayoutDefinition($field, null, $context);
 
+            //<<<ScopPatch
+            if ($field instanceof DataObject\ClassDefinition\Data\Fieldcollections) {
+                $collectionDef = DataObject\Fieldcollection\Definition::getByKey($field->getAllowedTypes()[0]);
+                $childrenDef = $collectionDef->getFieldDefinitions();
+                $localizedFields = $childrenDef['localizedfields'] ?? null;
+                unset($childrenDef['localizedfields']);
+                $children = array_values(array_map(static function($child) {
+                    $data = get_object_vars($child);
+                    $data['fieldtype'] = $child->getFieldType();
+                    $data['datatype'] = 'data';
+                    return $data;
+                }, $childrenDef));
+                if ($localizedFields !== null) {
+                    $children['localizedfields'] = array_values(array_map(static function($child) {
+                            $data = get_object_vars($child);
+                            $data['fieldtype'] = $child->getFieldType();
+                            $data['datatype'] = 'data';
+                            return $data;
+                        }, $localizedFields->getChildren()));
+                }
+                $field->children = $children;
+            }
+            //ScopPatch>>>
+
             $result = [
                 'key' => $key,
                 'type' => $field->getFieldType(),
