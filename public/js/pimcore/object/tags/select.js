@@ -263,7 +263,7 @@ pimcore.object.tags.select = Class.create(pimcore.object.tags.abstract, {
             store: store,
             listeners: {
                 focusenter: function(selectField, e) {
-                    if (this.fieldConfig.dynamicOptions) {
+                    if (this.fieldConfig.dynamicOptions && this.object?.data?.general?.type !== 'folder') {
                         Ext.Ajax.request({
                             url: Routing.generate('pimcore_admin_dataobject_dataobject_getSelectOptions'),
                             method: 'POST',

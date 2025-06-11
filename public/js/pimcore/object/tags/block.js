@@ -134,7 +134,7 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
         this.component = new Ext.Panel(panelConf);
 
         this.component.addListener("render", function() {
-            if(this.object.data.metaData[this.getName()] && this.object.data.metaData[this.getName()].hasParentValue) {
+            if(this.object.data.metaData && this.object.data.metaData[this.getName()] && this.object.data.metaData[this.getName()].hasParentValue) {
                 this.addInheritanceSourceButton(this.object.data.metaData[this.getName()]);
             }
         }.bind(this));
