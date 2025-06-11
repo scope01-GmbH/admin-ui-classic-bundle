@@ -78,6 +78,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     return saveData;
                 }
 
+
                 for (let item of value) {
                     if (typeof item.data !== 'undefined') {
                         for (let k in item.data) {
@@ -89,25 +90,6 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     }
                 }
                 record.data.data[key] = value;
-
-                let childrenFildDef = [];
-                for (const childKey in this.fieldConfig.children) {
-                    if (childKey === 'localizedfields') {
-                        for (const locChildKey in this.fieldConfig.children[childKey]) {
-                            childrenFildDef.push(this.fieldConfig.children[childKey][locChildKey]);
-                        }
-                    } else {
-                        childrenFildDef.push(this.fieldConfig.children[childKey]);
-                    }
-                }
-
-                let layoutForGrid = {
-                    datatype: "layout",
-                    name: field.name,
-                    fieldtype: "fieldcollections",
-                    children: childrenFildDef,
-                };
-
                 this.setObject(record);
                 this.updateContext({
                     objectId: record.id
@@ -116,7 +98,25 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 let html = '<div class="grid-cell-block"><hr>';
                 for (var i= 0; i < value.length; i++) {
                     let type = value[i].type;
+                    html += '<h3>' + type + '</h3>';
                     this.currentData = value[i].data;
+                    let childrenFildDef = [];
+                    for (const childKey in this.fieldConfig.children[type]) {
+                        if (childKey === 'localizedfields') {
+                            for (const locChildKey in this.fieldConfig.children[type][childKey]) {
+                                childrenFildDef.push(this.fieldConfig.children[type][childKey][locChildKey]);
+                            }
+                        } else {
+                            childrenFildDef.push(this.fieldConfig.children[type][childKey]);
+                        }
+                    }
+                    let layoutForGrid = {
+                        datatype: "layout",
+                        name: field.name,
+                        fieldtype: "fieldcollections",
+                        children: childrenFildDef,
+                    };
+
                     var items = this.getRecursiveLayout(
                         layoutForGrid,
                         true,
@@ -134,9 +134,24 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     if (Array.isArray(items)) {
                         for (const item of items) {
                             try {
-                                var rawLabel = item.getFieldLabel();
-                                var plainLabel = rawLabel ? rawLabel.replace(/<\/?[^>]+(>|$)/g, "") : '';
-                                html += '<strong>' + plainLabel + '</strong> : ' + item.getRawValue() + '<br>';
+                                if (Ext.isFunction(item.getFieldLabel)) {
+                                    var rawLabel = item.getFieldLabel();
+                                    var plainLabel = rawLabel ? rawLabel.replace(/<\/?[^>]+(>|$)/g, "") : '';
+                                    let name = item.componentCls.split('object_field_name_')[1] ?? null;
+                                    if (name) {
+                                        if (Ext.isFunction(item.getRawValue)) {
+                                            html += '<strong>' + plainLabel + '</strong> : ' + item.getRawValue() + '<br>';
+                                        } else if (item.items?.items) {
+                                            let complexData = '';
+                                            for (const subitem of item.items.items) {
+                                                if (Ext.isFunction(subitem.getRawValue)) {
+                                                    complexData += subitem.getRawValue() + ' ';
+                                                }
+                                            }
+                                            html += '<strong>' + plainLabel + '</strong> : ' + complexData + '<br>';
+                                        }
+                                    }
+                                }
                             } catch (e) {
                                 console.error(e);
                             }

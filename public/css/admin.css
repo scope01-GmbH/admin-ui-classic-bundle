@@ -2404,3 +2404,7 @@ ul.leaflet-draw-actions.leaflet-draw-actions-top.leaflet-draw-actions-bottom li:
 .x-grid-cell:has(.grid-cell-block) {
     align-content: center;
 }
+
+.x-grid-cell:has(.grid-cell-block) strong{
+    font-weight: 600;
+}

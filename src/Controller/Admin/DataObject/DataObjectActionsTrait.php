@@ -302,6 +302,31 @@ trait DataObjectActionsTrait
                                         }
                                         $setter = 'set' . ucfirst($fieldName);
                                         if (method_exists($collectionItem, $setter)) {
+                                            //ScopPatch>>>
+                                            $collectionDef = DataObject\Fieldcollection\Definition::getByKey($collectionItem->getType());
+                                            $fd = $collectionDef->getFieldDefinition($fieldName);
+                                            if ($fd instanceof DataObject\ClassDefinition\Data\QuantityValue && is_scalar($fieldValue)) {
+                                                $qv = new DataObject\Data\QuantityValue();
+                                                $qv->setValue($fieldValue);
+                                                $fieldValue = $qv;
+                                            }
+                                            if ($fd instanceof DataObject\ClassDefinition\Data\QuantityValue && is_array($fieldValue)) {
+                                                $qv = new DataObject\Data\QuantityValue();
+                                                $qv->setValue($fieldValue['value'] ?? null);
+                                                $qv->setUnitId($fieldValue['unit'] ?? null);
+                                                $fieldValue = $qv;
+                                            }
+                                            if ($fd instanceof DataObject\ClassDefinition\Data\Checkbox && !is_bool($fieldValue)) {
+                                                $fieldValue = boolval($fieldValue);
+                                            }
+                                            if ($fd instanceof DataObject\ClassDefinition\Data\Select && !is_string($fieldValue)) {
+                                                $fieldValue = (string)$fieldValue;
+                                            }
+                                            if ($fd instanceof DataObject\ClassDefinition\Data\Numeric && is_string($fieldValue)) {
+                                                $fieldValue = $fd->integer ? (int)$fieldValue : (float)$fieldValue;
+                                            }
+
+                                            //ScopPatch>>>
                                             $collectionItem->$setter($fieldValue);
                                         }
                                     }
