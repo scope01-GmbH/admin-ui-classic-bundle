@@ -172,7 +172,7 @@ pimcore.object.tags.multiselect = Class.create(pimcore.object.tags.abstract, {
                     return true;
                 }.bind(this),
                 focusenter: function(selectField, e) {
-                    if (this.fieldConfig.dynamicOptions) {
+                    if (this.fieldConfig.dynamicOptions && this.object?.data?.general?.type !== 'folder') {
                         Ext.Ajax.request({
                             url: Routing.generate('pimcore_admin_dataobject_dataobject_getSelectOptions'),
                             method: 'POST',

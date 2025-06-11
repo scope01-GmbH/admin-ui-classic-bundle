@@ -57,10 +57,6 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
             dataIndex: field.key,
             getEditor: this.getWindowCellEditor.bind(this, field),
             renderer: function (key, value, metaData, record, rowIdex, colIdex, grid, window) {
-                if (!value) {
-                    return '';
-                }
-                field.gridLanguage = grid.config.proxy.extraParams.language;
                 this.applyPermissionStyle(key, value, metaData, record);
                 if (typeof record.data.data === 'undefined') {
                     record.data.data = Ext.clone(record.data);
@@ -71,6 +67,11 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 if (typeof record.data.metaData === "undefined") {
                     record.data.metaData = metaData;
                 }
+
+                if (!value) {
+                    return '';
+                }
+                field.gridLanguage = grid.config.proxy.extraParams.language;
                 record.getSaveData = () => {
                     let saveData = {};
                     saveData.data = {key: record.data.data[key]};
