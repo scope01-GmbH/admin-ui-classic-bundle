@@ -1113,15 +1113,15 @@ class DataObjectHelperController extends AdminAbstractController
                     unset($childrenDef['localizedfields']);
                     $children = array_values(array_map(static function($child) {
                         $data = get_object_vars($child);
-                        $data['fieldtype'] = $child->getFieldType();
-                        $data['datatype'] = 'data';
+                        $data['fieldtype'] = $child instanceof DataObject\ClassDefinition\Data ? $child->getFieldType() : '';
+                        $data['datatype'] = $child instanceof DataObject\ClassDefinition\Data ? 'data' : 'layout';
                         return $data;
                     }, $childrenDef));
                     if ($localizedFields !== null) {
                         $children['localizedfields'] = array_values(array_map(static function($child) {
                             $data = get_object_vars($child);
-                            $data['fieldtype'] = $child->getFieldType();
-                            $data['datatype'] = 'data';
+                            $data['fieldtype'] = $child instanceof DataObject\ClassDefinition\Data ? $child->getFieldType() : '';
+                            $data['datatype'] = $child instanceof DataObject\ClassDefinition\Data ? 'data' : 'layout';
                             return $data;
                         }, $localizedFields->getChildren()));
                     }
