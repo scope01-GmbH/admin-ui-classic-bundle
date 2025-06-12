@@ -1115,6 +1115,12 @@ class DataObjectHelperController extends AdminAbstractController
                         $data = get_object_vars($child);
                         $data['fieldtype'] = $child instanceof DataObject\ClassDefinition\Data ? $child->getFieldType() : '';
                         $data['datatype'] = $child instanceof DataObject\ClassDefinition\Data ? 'data' : 'layout';
+                        $visibleGridView = $data['visibleGridView'] ?? false;
+                        if ($visibleGridView && isset($data['optionsProviderClass']) && $data['optionsProviderClass'] && empty($data['options'])) {
+                            /** @var \Pimcore\Model\DataObject\ClassDefinition\DynamicOptionsProvider\SelectOptionsProviderInterface $provider */
+                            $provider = \Pimcore::getContainer()->get(ltrim($data['optionsProviderClass'], '@'));
+                            $data['options'] = $provider->getOptions([], $child);
+                        }
                         return $data;
                     }, $childrenDef));
                     if ($localizedFields !== null) {
@@ -1122,6 +1128,12 @@ class DataObjectHelperController extends AdminAbstractController
                             $data = get_object_vars($child);
                             $data['fieldtype'] = $child instanceof DataObject\ClassDefinition\Data ? $child->getFieldType() : '';
                             $data['datatype'] = $child instanceof DataObject\ClassDefinition\Data ? 'data' : 'layout';
+                            $visibleGridView = $data['visibleGridView'] ?? false;
+                            if ($visibleGridView && isset($data['optionsProviderClass']) && $data['optionsProviderClass'] && empty($data['options'])) {
+                                /** @var \Pimcore\Model\DataObject\ClassDefinition\DynamicOptionsProvider\SelectOptionsProviderInterface $provider */
+                                $provider = \Pimcore::getContainer()->get(ltrim($data['optionsProviderClass'], '@'));
+                                $data['options'] = $provider->getOptions([], $child);
+                            }
                             return $data;
                         }, $localizedFields->getChildren()));
                     }

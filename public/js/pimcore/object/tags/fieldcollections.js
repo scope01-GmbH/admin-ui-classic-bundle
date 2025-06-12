@@ -83,7 +83,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 for (let item of value) {
                     if (typeof item.data !== 'undefined') {
                         for (let k in item.data) {
-                            if (typeof item.data[k].value !== 'undefined') {
+                            if (typeof item.data[k] && typeof item.data[k]?.value !== 'undefined') {
                                 let childValue = item.data[k].value;
                                 item.data[k] = childValue;
                             }
@@ -105,9 +105,21 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     for (const childKey in this.fieldConfig.children[type]) {
                         if (childKey === 'localizedfields') {
                             for (const locChildKey in this.fieldConfig.children[type][childKey]) {
+                                if (!this.fieldConfig.children[type][childKey][locChildKey].visibleGridView) {
+                                    continue;
+                                }
+                                if (this.fieldConfig.children[type][childKey][locChildKey].showCharCount) {
+                                    this.fieldConfig.children[type][childKey][locChildKey].showCharCount = false;
+                                }
                                 childrenFildDef.push(this.fieldConfig.children[type][childKey][locChildKey]);
                             }
                         } else {
+                            if (!this.fieldConfig.children[type][childKey].visibleGridView) {
+                                continue;
+                            }
+                            if (this.fieldConfig.children[type][childKey].showCharCount) {
+                                this.fieldConfig.children[type][childKey].showCharCount = false;
+                            }
                             childrenFildDef.push(this.fieldConfig.children[type][childKey]);
                         }
                     }
