@@ -102,25 +102,27 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     html += '<h3>' + type + '</h3>';
                     this.currentData = value[i].data;
                     let childrenFildDef = [];
-                    for (const childKey in this.fieldConfig.children[type]) {
-                        if (childKey === 'localizedfields') {
-                            for (const locChildKey in this.fieldConfig.children[type][childKey]) {
-                                if (!this.fieldConfig.children[type][childKey][locChildKey].visibleGridView) {
+                    if (this.fieldConfig.children) {
+                        for (const childKey in this.fieldConfig.children[type]) {
+                            if (childKey === 'localizedfields') {
+                                for (const locChildKey in this.fieldConfig.children[type][childKey]) {
+                                    if (!this.fieldConfig.children[type][childKey][locChildKey].visibleGridView) {
+                                        continue;
+                                    }
+                                    if (this.fieldConfig.children[type][childKey][locChildKey].showCharCount) {
+                                        this.fieldConfig.children[type][childKey][locChildKey].showCharCount = false;
+                                    }
+                                    childrenFildDef.push(this.fieldConfig.children[type][childKey][locChildKey]);
+                                }
+                            } else {
+                                if (!this.fieldConfig.children[type][childKey].visibleGridView) {
                                     continue;
                                 }
-                                if (this.fieldConfig.children[type][childKey][locChildKey].showCharCount) {
-                                    this.fieldConfig.children[type][childKey][locChildKey].showCharCount = false;
+                                if (this.fieldConfig.children[type][childKey].showCharCount) {
+                                    this.fieldConfig.children[type][childKey].showCharCount = false;
                                 }
-                                childrenFildDef.push(this.fieldConfig.children[type][childKey][locChildKey]);
+                                childrenFildDef.push(this.fieldConfig.children[type][childKey]);
                             }
-                        } else {
-                            if (!this.fieldConfig.children[type][childKey].visibleGridView) {
-                                continue;
-                            }
-                            if (this.fieldConfig.children[type][childKey].showCharCount) {
-                                this.fieldConfig.children[type][childKey].showCharCount = false;
-                            }
-                            childrenFildDef.push(this.fieldConfig.children[type][childKey]);
                         }
                     }
                     let layoutForGrid = {
