@@ -375,6 +375,21 @@ trait DataObjectActionsTrait
         if ($fd instanceof DataObject\ClassDefinition\Data\Numeric && is_string($fieldValue)) {
             $fieldValue = $fd->integer ? (int)$fieldValue : (float)$fieldValue;
         }
+        if ($fd instanceof DataObject\ClassDefinition\Data\Relations\AbstractRelations && is_array($fieldValue)) {
+            if (method_exists($fd, 'getMaxItems')) {
+                //many-to-many
+                foreach ($fieldValue as &$item) {
+                    if (is_array($item) && isset($item['id']) && isset($item['type'])) {
+                        $item = \Pimcore\Model\Element\Service::getElementById($item['type'], (int)$item['id']);
+                    }
+                }
+                unset($item);
+            } else {
+                if (isset($fieldValue['id']) && isset($fieldValue['type'])) {
+                    $fieldValue = \Pimcore\Model\Element\Service::getElementById($fieldValue['type'], (int)$fieldValue['id']);
+                }
+            }
+        }
         return $fieldValue;
     }
     //ScopPatch>>>
