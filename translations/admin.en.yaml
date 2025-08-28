@@ -72,6 +72,7 @@ medium: Medium
 saved_successfully: 'Saved successfully!'
 qr_codes: QR-Codes
 element: Element
+elements: Elements
 details_for_selected_event: 'Details for selected element'
 fields: Fields
 not_possible_with_paging: 'Sorry, this is not possible in elements which are paged, try to restructure your data to avoid pages in the tree'

@@ -149,11 +149,12 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     if (Array.isArray(items)) {
                         for (const item of items) {
                             try {
-                                if (Ext.isFunction(item.getFieldLabel)) {
-                                    var rawLabel = item.getFieldLabel();
+                                if (Ext.isFunction(item.getFieldLabel) || item.title) {
+                                    var rawLabel = Ext.isFunction(item.getFieldLabel) ? item.getFieldLabel() : item.title;
                                     var plainLabel = rawLabel ? rawLabel.replace(/<\/?[^>]+(>|$)/g, "") : '';
                                     let name = item.componentCls.split('object_field_name_')[1] ?? null;
-                                    if (name) {
+                                    let isManyToMany = /object_field_type_manyToMany/.test(item.cls);
+                                    if (name || isManyToMany) {
                                         if (Ext.isFunction(item.getRawValue)) {
                                             html += '<strong>' + plainLabel + '</strong> : ' + item.getRawValue() + '<br>';
                                         } else if (item.items?.items) {
@@ -162,6 +163,9 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                                                 if (Ext.isFunction(subitem.getRawValue)) {
                                                     complexData += subitem.getRawValue() + ' ';
                                                 }
+                                            }
+                                            if (!complexData) {
+                                                complexData = item.items.items.length + (item.items.items.length > 1 ? ` ${t('elements')}` : ` ${t('element')}`);
                                             }
                                             html += '<strong>' + plainLabel + '</strong> : ' + complexData + '<br>';
                                         }

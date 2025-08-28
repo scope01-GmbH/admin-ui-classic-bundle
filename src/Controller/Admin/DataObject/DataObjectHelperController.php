@@ -1108,7 +1108,7 @@ class DataObjectHelperController extends AdminAbstractController
             if ($field instanceof DataObject\ClassDefinition\Data\Fieldcollections) {
                 foreach ($field->getAllowedTypes() as $fcType) {
                     $collectionDef = DataObject\Fieldcollection\Definition::getByKey($fcType);
-                    $childrenDef = $collectionDef->getFieldDefinitions();
+                    $childrenDef = $collectionDef->getFieldDefinitions(['subContainerName' => $field->getName()]);
                     $localizedFields = $childrenDef['localizedfields'] ?? null;
                     unset($childrenDef['localizedfields']);
                     $children = array_values(array_map(static function($child) {
