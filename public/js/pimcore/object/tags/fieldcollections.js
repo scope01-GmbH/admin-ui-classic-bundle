@@ -164,8 +164,8 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                                                     complexData += subitem.getRawValue() + ' ';
                                                 }
                                             }
-                                            if (!complexData) {
-                                                complexData = item.items.items.length + (item.items.items.length > 1 ? ` ${t('elements')}` : ` ${t('element')}`);
+                                            if (!complexData && isManyToMany) {
+                                                complexData = item.store?.data?.items.length + (item.store?.data?.items.length  > 1 ? ` ${t('elements')}` : ` ${t('element')}`);
                                             }
                                             html += '<strong>' + plainLabel + '</strong> : ' + complexData + '<br>';
                                         }
