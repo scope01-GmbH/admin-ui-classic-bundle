@@ -99,7 +99,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 let html = '<div class="grid-cell-block"><hr>';
                 for (var i= 0; i < value.length; i++) {
                     let type = value[i].type;
-                    html += '<h3>' + type + '</h3>';
+                    html += '<h4>' + type + '</h4>';
                     this.currentData = value[i].data;
                     let childrenFildDef = [];
                     if (this.fieldConfig.children) {
