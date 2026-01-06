@@ -1482,7 +1482,7 @@ Ext.define('Ext.grid.filters.filter.scopFieldCollections', {
         if (me.fcs[type]) {
             for (const key in me.fcs[type]) {
                 let fieldData = me.fcs[type][key];
-                if (fieldData.fieldtype === 'quantityValue') {
+                if (fieldData.fieldtype === 'quantityValue' && !fieldData.name.endsWith('__value')) {
                     fieldData.name = fieldData.name + '__value';
                 }
                 storeData.push({'label': fieldData.title, 'key': fieldData.name});
