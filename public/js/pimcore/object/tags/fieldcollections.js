@@ -84,6 +84,10 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     if (typeof item.data !== 'undefined') {
                         for (let k in item.data) {
                             if (typeof item.data[k] && typeof item.data[k]?.value !== 'undefined') {
+                                if (!item.titles) {
+                                    item.titles = {};
+                                }
+                                item.titles[k] = item.data[k]?.title;
                                 let childValue = item.data[k].value;
                                 item.data[k] = childValue;
                             }
@@ -109,70 +113,19 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                                     if (!this.fieldConfig.children[type][childKey][locChildKey].visibleGridView) {
                                         continue;
                                     }
-                                    if (this.fieldConfig.children[type][childKey][locChildKey].showCharCount) {
-                                        this.fieldConfig.children[type][childKey][locChildKey].showCharCount = false;
-                                    }
-                                    childrenFildDef.push(this.fieldConfig.children[type][childKey][locChildKey]);
+                                    let name = this.fieldConfig.children[type][childKey][locChildKey].name;
+                                    let plainLabel = value[i].titles[name] ?? name;
+                                    let rawValue = this.currentData[childKey]['data'][field.gridLanguage][name] ?? null;
+                                    html += '<strong>' + plainLabel + '</strong> : ' + rawValue + '<br>';
                                 }
                             } else {
                                 if (!this.fieldConfig.children[type][childKey].visibleGridView) {
                                     continue;
                                 }
-                                if (this.fieldConfig.children[type][childKey].showCharCount) {
-                                    this.fieldConfig.children[type][childKey].showCharCount = false;
-                                }
-                                childrenFildDef.push(this.fieldConfig.children[type][childKey]);
-                            }
-                        }
-                    }
-                    let layoutForGrid = {
-                        datatype: "layout",
-                        name: field.name,
-                        fieldtype: "fieldcollections",
-                        children: childrenFildDef,
-                    };
-
-                    var items = this.getRecursiveLayout(
-                        layoutForGrid,
-                        true,
-                        {
-                            target: 'grid',
-                            containerType: "fieldcollection",
-                            containerName: this.fieldConfig.name,
-                            containerKey: type,
-                            index: i,
-                            applyDefaults: true,
-                            gridLanguage: field.gridLanguage,
-                        },
-                        undefined, undefined, undefined, true);
-                    items = items.items;
-                    if (Array.isArray(items)) {
-                        for (const item of items) {
-                            try {
-                                if (Ext.isFunction(item.getFieldLabel) || item.title) {
-                                    var rawLabel = Ext.isFunction(item.getFieldLabel) ? item.getFieldLabel() : item.title;
-                                    var plainLabel = rawLabel ? rawLabel.replace(/<\/?[^>]+(>|$)/g, "") : '';
-                                    let name = item.componentCls.split('object_field_name_')[1] ?? null;
-                                    let isManyToMany = /object_field_type_manyToMany/.test(item.cls);
-                                    if (name || isManyToMany) {
-                                        if (Ext.isFunction(item.getRawValue)) {
-                                            html += '<strong>' + plainLabel + '</strong> : ' + item.getRawValue() + '<br>';
-                                        } else if (item.items?.items) {
-                                            let complexData = '';
-                                            for (const subitem of item.items.items) {
-                                                if (Ext.isFunction(subitem.getRawValue)) {
-                                                    complexData += subitem.getRawValue() + ' ';
-                                                }
-                                            }
-                                            if (!complexData && isManyToMany) {
-                                                complexData = item.store?.data?.items.length + (item.store?.data?.items.length  > 1 ? ` ${t('elements')}` : ` ${t('element')}`);
-                                            }
-                                            html += '<strong>' + plainLabel + '</strong> : ' + complexData + '<br>';
-                                        }
-                                    }
-                                }
-                            } catch (e) {
-                                console.error(e);
+                                let name = this.fieldConfig.children[type][childKey].name;
+                                let plainLabel = value[i].titles[name] ?? name;
+                                let rawValue = this.currentData[name] ?? null;
+                                html += '<strong>' + plainLabel + '</strong> : ' + rawValue + '<br>';
                             }
                         }
                     }
