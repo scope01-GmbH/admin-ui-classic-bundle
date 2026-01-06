@@ -1360,3 +1360,305 @@ Ext.define('Ext.grid.filters.filter.Number', {
         e.stopPropagation();
     }
 });
+
+//<<ScopePatch
+Ext.define('Ext.grid.filters.filter.scopFieldCollections', {
+    extend: 'Ext.grid.filters.filter.SingleFilter',
+    alias: 'grid.filter.scopFieldCollections',
+    type: 'scopFieldCollections',
+    operator: 'eq',
+    localized: false,
+
+    activateMenu: function() {
+        const me = this;
+
+        if (!me.isActivatable()) {
+            me.setActive(false);
+            return false;
+        }
+
+        me.setActive(true);
+        return true;
+    },
+
+    createMenu: function () {
+        const me = this;
+        me.callParent(arguments);
+        me.typeCombo = Ext.create('Ext.form.field.ComboBox', {
+            labelClsExtra: Ext.baseCSSPrefix + 'grid-filters-icon ' + Ext.baseCSSPrefix + 'grid-filters-find',
+            hideEmptyLabel: false,
+            labelSeparator: "",
+            labelWidth: 29,
+            width: 250,
+            margin: 0,
+            store: me.typeStore,
+            valueField: 'key',
+            displayField: 'label',
+            editable: false,
+            queryMode: 'local',
+            emptyText: 'Type',
+            listeners: {
+                change: me.onTypeChange,
+                scope: me
+            }
+        });
+
+        me.fieldStore = Ext.create('Ext.data.JsonStore', {
+            fields: ['key', "label"],
+            data: []
+        });
+
+        me.fieldCombo = Ext.create('Ext.form.field.ComboBox', {
+            labelClsExtra: Ext.baseCSSPrefix + 'grid-filters-icon pimcore_nav_icon_fieldcollection',
+            hideEmptyLabel: false,
+            labelSeparator: "",
+            labelWidth: 29,
+            margin: 0,
+            store: me.fieldStore,
+            valueField: 'key',
+            displayField: 'label',
+            editable: false,
+            queryMode: 'local',
+            width: 250,
+            emptyText: 'Field',
+            disabled: true,
+            triggers: {
+                clear: {
+                    cls: Ext.baseCSSPrefix + 'form-clear-trigger',
+                    hidden: true,
+                    handler: function () {
+                        this.setValue(null);
+                        me.valueField.reset();
+                        me.valueField.setDisabled(true);
+                    }
+                }
+            },
+            listeners: {
+                change: function (cb, v) {
+                    cb.getTrigger('clear').setVisible(!!v);
+                    me.onFieldChange();
+                },
+                select: function (cb) {
+                    cb.getTrigger('clear').show();
+                },
+                scope: me,
+            }
+        });
+
+        me.valueField = Ext.create('Ext.form.field.Text', {
+            labelClsExtra: Ext.baseCSSPrefix,
+            hideEmptyLabel: false,
+            labelSeparator: "",
+            labelWidth: 29,
+            width: 250,
+            margin: 0,
+            disabled: true,
+            listeners: {
+                change: me.onAnyChange,
+                scope: me
+            }
+        });
+        me.menu.add(me.typeCombo);
+        me.menu.add(me.fieldCombo);
+        me.menu.add(me.valueField);
+        return me.menu;
+    },
+
+    onTypeChange: function () {
+        const me = this;
+        const type = me.typeCombo.getValue();
+
+        me.fieldCombo.reset();
+        me.valueField.reset();
+
+        me.fieldCombo.setDisabled(!type);
+        me.valueField.setDisabled(true);
+
+        if (!type) {
+            me.setActive(false);
+            return;
+        }
+        let storeData = [];
+        if (me.fcs[type]) {
+            for (const key in me.fcs[type]) {
+                let fieldData = me.fcs[type][key];
+                if (fieldData.fieldtype === 'quantityValue') {
+                    fieldData.name = fieldData.name + '__value';
+                }
+                storeData.push({'label': fieldData.title, 'key': fieldData.name});
+            }
+        }
+        me.fieldStore.loadData(storeData);
+        me.onAnyChange();
+    },
+
+    onFieldChange: function () {
+        const me = this;
+        const rec = me.fieldStore.findRecord('key', me.fieldCombo.getValue());
+        let fieldDef = null;
+        if (rec) {
+            const type = me.typeCombo.getValue();
+            if (me.fcs[type]) {
+                for (const key in me.fcs[type]) {
+                    if (me.fcs[type][key].name === rec.get('key')) {
+                        fieldDef = me.fcs[type][key];
+                        this.localized = fieldDef?.localized || false;
+                        break;
+                    }
+                }
+            }
+        }
+        me.rebuildValueField(fieldDef);
+        me.onAnyChange();
+    },
+
+    rebuildValueField: function (fieldDef) {
+        const me = this;
+        const parent = me.valueField.ownerCt;
+
+        parent.remove(me.valueField, true);
+
+        me.operator = me.defaultOperatorFor(fieldDef);
+        const cfg = me.getValueFieldConfig(fieldDef);
+
+        me.valueField = Ext.create(cfg);
+
+        me.valueField.on('change', me.onAnyChange, me);
+
+        parent.add(me.valueField);
+        parent.updateLayout();
+
+        me.valueField.setDisabled(false);
+    },
+
+    defaultOperatorFor: function(fieldDef) {
+        switch ((fieldDef?.fieldtype || '').toLowerCase()) {
+            case 'numeric':
+            case 'number':
+                return 'eq';
+            case 'date':
+            case 'datetime':
+                return 'eq';
+            case 'checkbox':
+                return 'eq';
+            case 'select':
+            case 'multiselect':
+                return 'in';
+            case 'input':
+            default:
+                return 'like';
+        }
+    },
+
+    getValueFieldConfig: function (fieldDef) {
+        const me = this;
+        let fieldType = (fieldDef?.fieldtype || 'input');
+        let iconCls = 'pimcore_icon_' + fieldType;
+        fieldType = fieldType.toLowerCase()
+        // fallback: Text
+        let cfg = {
+            xtype: 'textfield',
+            emptyText: 'Enter Filter Text...',
+            hideEmptyLabel: false,
+            labelSeparator: "",
+            labelWidth: 29,
+            width: 250,
+            margin: 0,
+        };
+
+        if (fieldType === 'numeric' || fieldType === 'number' || fieldType === 'quantityvalue') {
+            Ext.merge(cfg, {
+                xtype: 'numberfield',
+                allowDecimals: true,
+                hideTrigger: true,
+                emptyText: 'Enter Number...',
+            });
+        }
+
+        if (fieldType === 'checkbox' || fieldType === 'bool' || fieldType === 'boolean') {
+            Ext.merge(cfg, {
+                xtype: 'combobox',
+                editable: false,
+                selectOnFocus: false,
+                queryMode: 'local',
+                valueField: 'value',
+                displayField: 'label',
+                store: Ext.create('Ext.data.Store', {
+                    fields: ['value', 'label'],
+                    data: [
+                        { value: 1, label: 'Yes' },
+                        { value: 0, label: 'No' }
+                    ]
+                })
+            });
+        }
+
+        if (fieldType === 'select') {
+            Ext.merge(cfg, {
+                xtype: 'combobox',
+                editable: false,
+                selectOnFocus: false,
+                queryMode: 'local',
+                valueField: 'value',
+                displayField: 'label',
+                store: me.buildOptionsStore(fieldDef)
+            });
+        }
+
+        if (fieldType === 'multiselect') {
+            // ExtJS 6 has TagField
+            Ext.merge(cfg, {
+                xtype: 'tagfield',
+                editable: false,
+                selectOnFocus: false,
+                queryMode: 'local',
+                filterPickList: true,
+                valueField: 'value',
+                displayField: 'label',
+                store: me.buildOptionsStore(fieldDef)
+            });
+        }
+        cfg.labelClsExtra = Ext.baseCSSPrefix + 'grid-filters-icon ' + iconCls;
+        return cfg;
+    },
+
+    buildOptionsStore: function(fieldDef) {
+        const options = Array.isArray(fieldDef.options) ? fieldDef.options.map((el) => {
+            return {label: el.key, value: el.value}
+        }) : [];
+        return Ext.create('Ext.data.Store', {
+            fields: ['value', 'label'],
+            data: options
+        });
+    },
+
+    onAnyChange: function () {
+        let complexValue = this.buildComplexValue();
+        if (this.localized) {
+            complexValue.type += '_localized';
+        }
+        this.filter.setValue(complexValue);
+        this.filter.config.operator = this.operator;
+        this.filter.initialConfig.operator = this.operator;
+        this.filter.setOperator(this.operator);
+        this.setActive(this.isActivatable());
+        if (this.active) {
+            this.updateStoreFilter();
+        }
+    },
+
+    buildComplexValue: function () {
+        return {
+            type: this.typeCombo.getValue(),
+            field: this.fieldCombo.getValue(),
+            value: this.valueField.getValue(),
+            join: () => {},
+        };
+    },
+
+    isActivatable: function () {
+        return !!this.typeCombo.getValue();
+    },
+});
+
+//ScopePatch>>

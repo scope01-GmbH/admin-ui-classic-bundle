@@ -747,7 +747,38 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         }
 
         return false;
+    },
+
+    //<<ScopePatch
+    getGridColumnFilter: function(field) {
+        let fcs = field.layout?.children;
+        let fcsData = [];
+        if (fcs) {
+            for (const fcsKey in fcs) {
+                fcsData.push({'label': fcsKey, 'key': fcsKey});
+                if (fcs[fcsKey].localizedfields) {
+                    for (const locFieldKey in fcs[fcsKey].localizedfields) {
+                        fcs[fcsKey].localizedfields[locFieldKey].localized = true;
+                    }
+                    Ext.merge(fcs[fcsKey], fcs[fcsKey].localizedfields);
+                    delete fcs[fcsKey].localizedfields;
+                }
+            }
+        }
+        var fcStore = Ext.create('Ext.data.JsonStore', {
+            fields: ['key', "label"],
+            data: fcsData
+        });
+
+        return {
+            type: 'scopFieldCollections',
+            dataIndex: field.key,
+            typeStore: fcStore,
+            fcs: fcs
+        };
+
     }
+    //ScopePatch>>
 });
 
 pimcore.object.tags.fieldcollections.addMethods(pimcore.object.helpers.edit);
