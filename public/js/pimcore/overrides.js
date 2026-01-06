@@ -1593,20 +1593,7 @@ Ext.define('Ext.grid.filters.filter.scopFieldCollections', {
             });
         }
 
-        if (fieldType === 'select') {
-            Ext.merge(cfg, {
-                xtype: 'combobox',
-                editable: false,
-                selectOnFocus: false,
-                queryMode: 'local',
-                valueField: 'value',
-                displayField: 'label',
-                store: me.buildOptionsStore(fieldDef)
-            });
-        }
-
-        if (fieldType === 'multiselect') {
-            // ExtJS 6 has TagField
+        if (fieldType === 'select' || fieldType === 'multiselect') {
             Ext.merge(cfg, {
                 xtype: 'tagfield',
                 editable: false,
