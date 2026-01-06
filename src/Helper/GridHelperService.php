@@ -686,8 +686,11 @@ class GridHelperService
                             $conditionFilters[] = "($alias.$fieldCollectionField IS NULL OR $alias.$fieldCollectionField = '')";
                             continue;
                         }
-                        $fieldCollectionValue = implode(',', $fieldCollectionValue);
-                        $conditionFilters[] = "$alias.$fieldCollectionField IN ($fieldCollectionValue)";
+                        $filterParts = [];
+                        foreach ($fieldCollectionValue as $oneValue) {
+                            $filterParts[] = "$alias.$fieldCollectionField = '$oneValue' OR $alias.$fieldCollectionField LIKE '%,$oneValue%' OR $alias.$fieldCollectionField LIKE '%$oneValue,%'";
+                        }
+                        $conditionFilters[] = '(' . implode(' OR ', $filterParts) . ')';
                         continue;
                     }
 
