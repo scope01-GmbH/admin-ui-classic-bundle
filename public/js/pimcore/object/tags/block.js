@@ -32,15 +32,85 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
         Ext.apply(this.fieldConfig, fieldConfig);
     },
 
-    getGridColumnConfig: function(field) {
-        return {text: t(field.label), width: 150, sortable: false, dataIndex: field.key,
-            renderer: function (key, value, metaData, record) {
-                this.applyPermissionStyle(key, value, metaData, record);
-
-                return t("not_supported");
-            }.bind(this, field.key)};
+    //<<<ScopPatch
+    getCellEditValue: function () {
+        return this.getValue();
     },
 
+    getGridColumnConfig: function(field) {
+        return {
+            text: t(field.label),
+            width: 300,
+            sortable: false,
+            dataIndex: field.key,
+            renderer: function (key, value, metaData, record) {
+                this.applyPermissionStyle(key, value, metaData, record);
+                if (typeof record.data.data === 'undefined') {
+                    record.data.data = Ext.clone(record.data);
+                }
+                if (typeof record.data.general === 'undefined') {
+                    record.data.general = record.data.data;
+                }
+                if (typeof record.data.metaData === "undefined") {
+                    record.data.metaData = metaData;
+                }
+                record.getSaveData = () => {
+                    let saveData = {};
+                    saveData.data = {key: record.data.data[key]};
+                    saveData.data = Ext.encode(saveData.data);
+                    return saveData;
+                }
+
+                this.setObject(record);
+                this.updateContext({
+                    objectId: record.id
+                });
+
+                let layoutForGrid = {
+                    datatype: "layout",
+                    name: field.name,
+                    fieldtype: "block",
+                    children: this.fieldConfig.children,
+                };
+                let html = '<div class="grid-cell-block"><hr>';
+                for (var i= 0; i < value.length; i++) {
+                    this.currentData = value[i].data;
+                    var context = this.getContext();
+                    context["subContainerType"] = "block";
+                    context["subContainerKey"] = field.name;
+                    context["applyDefaults"] = true;
+                    var items = this.getRecursiveLayout(
+                        layoutForGrid,
+                        true,
+                        {
+                            target: 'grid',
+                            subContainerType: "block",
+                            subContainerKey: field.name,
+                            applyDefaults: true,
+                            gridLanguage: field.gridLanguage,
+                        },
+                        undefined, undefined, undefined, true);
+                    items = items.items;
+                    if (Array.isArray(items)) {
+                        for (const item of items) {
+                            try {
+                                var rawLabel = item.getFieldLabel();
+                                var plainLabel = rawLabel ? rawLabel.replace(/<\/?[^>]+(>|$)/g, "") : '';
+                                html += '<strong>' + plainLabel + '</strong> : ' + item.getRawValue() + '<br>';
+                            } catch (e) {
+                                console.error(e);
+                            }
+                        }
+                    }
+                    html += '<hr>';
+                }
+                html += '</div>';
+                return html;
+            }.bind(this, field.key),
+            getEditor: this.getWindowCellEditor.bind(this, field)
+        };
+    },
+    //ScopPatch>>>
 
     getLayoutEdit: function () {
         this.fieldConfig.datatype ="layout";
@@ -61,7 +131,7 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
         this.component = new Ext.Panel(panelConf);
 
         this.component.addListener("render", function() {
-            if(this.object.data.metaData[this.getName()] && this.object.data.metaData[this.getName()].hasParentValue) {
+            if(this.object.data.metaData && this.object.data.metaData[this.getName()] && this.object.data.metaData[this.getName()].hasParentValue) {
                 this.addInheritanceSourceButton(this.object.data.metaData[this.getName()]);
             }
         }.bind(this));
@@ -72,7 +142,6 @@ pimcore.object.tags.block = Class.create(pimcore.object.tags.abstract, {
     },
 
     initData: function () {
-
         if(this.data.length < 1) {
             this.component.add(this.getControls());
         } else {

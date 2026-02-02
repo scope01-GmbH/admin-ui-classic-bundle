@@ -19,6 +19,7 @@ use Pimcore\Bundle\AdminBundle\Service\GridData;
 use Pimcore\Localization\LocaleServiceInterface;
 use Pimcore\Logger;
 use Pimcore\Model\DataObject;
+use Pimcore\Model\DataObject\Fieldcollection;
 use Pimcore\Tool;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpFoundation\Request;
@@ -260,6 +261,69 @@ trait DataObjectActionsTrait
                     $brick->markFieldDirty($brickKey);
                 }
             } else {
+                //<<<ScopPatch
+                $fieldDefinition = $this->getFieldDefinition($class, $key);
+                if ($fieldDefinition instanceof DataObject\ClassDefinition\Data\Block) {
+                    $fields = $fieldDefinition->getFieldDefinitions();
+                    $fieldTypes = [];
+                    foreach ($fields as $fieldName => $field) {
+                        $fieldTypes[$fieldName] = $field->getFieldType();
+                    }
+
+                    foreach($value as $index => $item) {
+                        if (is_array($item) && isset($item['data'])) {
+                            $blockData = $item['data'];
+                            foreach ($blockData as $fieldName => $fieldValue) {
+                                $blockData[$fieldName] = new DataObject\Data\BlockElement($fieldName, $fieldTypes[$fieldName], $fieldValue);
+                            }
+                            $value[$index] = $blockData;
+                        }
+                    }
+                }
+                if ($fieldDefinition instanceof DataObject\ClassDefinition\Data\Fieldcollections) {
+                    if (is_array($value)) {
+                        $fieldCollectionItems = new Fieldcollection();
+                        foreach ($value as $index => $item) {
+                            if (isset($item['type'])) {
+                                $type = 'Pimcore\\Model\\DataObject\\Fieldcollection\\Data\\' . $item['type'];
+                                if (class_exists($type)) {
+                                    $collectionItem = new $type();
+                                    $itemData = $item['data'] ?? [];
+                                    //ScopPatch>>>
+                                    $collectionDef = DataObject\Fieldcollection\Definition::getByKey($collectionItem->getType());
+                                    //ScopPatch>>>
+                                    foreach ($itemData as $fieldName => $fieldValue) {
+                                        if ($fieldName === 'localizedfields') {
+                                            foreach ($fieldValue as $lang => $localizedValues) {
+                                                foreach ($localizedValues as $localizedKey => $localizedValue) {
+                                                    $setter = 'set' . ucfirst($localizedKey);
+                                                    if (method_exists($collectionItem, $setter)) {
+                                                        //ScopPatch>>>
+                                                        $fd = $collectionDef->getFieldDefinition($localizedKey);
+                                                        $localizedValue = $this->convertGridValueToSave($fd, $localizedValue);
+                                                        //ScopPatch>>>
+                                                        $collectionItem->$setter($localizedValue, $lang);
+                                                    }
+                                                }
+                                            }
+                                            continue;
+                                        }
+                                        $setter = 'set' . ucfirst($fieldName);
+                                        if (method_exists($collectionItem, $setter)) {
+                                            //ScopPatch>>>
+                                            $fd = $collectionDef->getFieldDefinition($fieldName);
+                                            $fieldValue = $this->convertGridValueToSave($fd, $fieldValue);
+                                            //ScopPatch>>>
+                                            $collectionItem->$setter($fieldValue);
+                                        }
+                                    }
+                                    $fieldCollectionItems->add($collectionItem);
+                                }
+                            }
+                        }
+                        $value = $fieldCollectionItems;
+                    }
+                }
                 if ($languagePermissions) {
                     $fd = $class->getFieldDefinition($key);
                     if (!$fd) {
@@ -288,6 +352,48 @@ trait DataObjectActionsTrait
 
         return $objectData;
     }
+
+    //ScopPatch>>>
+    private function convertGridValueToSave(mixed $fd, mixed $fieldValue): mixed
+    {
+        if ($fd instanceof DataObject\ClassDefinition\Data\QuantityValue && is_scalar($fieldValue)) {
+            $qv = new DataObject\Data\QuantityValue();
+            $qv->setValue($fieldValue);
+            $fieldValue = $qv;
+        }
+        if ($fd instanceof DataObject\ClassDefinition\Data\QuantityValue && is_array($fieldValue)) {
+            $qv = new DataObject\Data\QuantityValue();
+            $qv->setValue($fieldValue['value'] ?? null);
+            $qv->setUnitId($fieldValue['unit'] ?? null);
+            $fieldValue = $qv;
+        }
+        if ($fd instanceof DataObject\ClassDefinition\Data\Checkbox && !is_bool($fieldValue)) {
+            $fieldValue = boolval($fieldValue);
+        }
+        if ($fd instanceof DataObject\ClassDefinition\Data\Select && !is_string($fieldValue)) {
+            $fieldValue = (string)$fieldValue;
+        }
+        if ($fd instanceof DataObject\ClassDefinition\Data\Numeric && is_string($fieldValue)) {
+            $fieldValue = $fd->integer ? (int)$fieldValue : (float)$fieldValue;
+        }
+        if ($fd instanceof DataObject\ClassDefinition\Data\Relations\AbstractRelations && is_array($fieldValue)) {
+            if (method_exists($fd, 'getMaxItems')) {
+                //many-to-many
+                foreach ($fieldValue as &$item) {
+                    if (is_array($item) && isset($item['id']) && isset($item['type'])) {
+                        $item = \Pimcore\Model\Element\Service::getElementById($item['type'], (int)$item['id']);
+                    }
+                }
+                unset($item);
+            } else {
+                if (isset($fieldValue['id']) && isset($fieldValue['type'])) {
+                    $fieldValue = \Pimcore\Model\Element\Service::getElementById($fieldValue['type'], (int)$fieldValue['id']);
+                }
+            }
+        }
+        return $fieldValue;
+    }
+    //ScopPatch>>>
 
     protected function getFieldDefinition(DataObject\ClassDefinition $class, string $key): ?DataObject\ClassDefinition\Data
     {

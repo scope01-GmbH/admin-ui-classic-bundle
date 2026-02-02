@@ -310,6 +310,20 @@ class DataObject extends Element
             }
         }
 
+        //<<<ScopPatch
+        if ($fieldDefinition instanceof \Pimcore\Model\DataObject\ClassDefinition\Data\Block && is_array($value)) {
+            foreach ($value as $index => $item) {
+                foreach ($item as $fieldName => $fieldValue) {
+                    $item[$fieldName] = $fieldValue->getData();
+                }
+                $value[$index] = [
+                    'oIndex' => $index,
+                    'data' => $item
+                ];
+            }
+        }
+        //ScopPatch>>>
+
         $result = new \stdClass();
         $result->value = $value;
         $result->objectid = $object->getId();
