@@ -688,6 +688,82 @@ class GridHelperService
         $featureAndSlugFilters = [];
 
         // create filter condition
+
+        //<<<ScopPatch
+        if (!empty($requestParams['filter'])) {
+            $list->setLocale($requestParams['language']);
+            $filters = json_decode((string)$requestParams['filter'], true);
+            $scopFieldCollectionsFilters = [];
+            if (is_array($filters)) {
+                foreach ($filters as $key => $filter) {
+                    $filterType = $filter['type'] ?? null;
+                    if ($filterType === 'scopFieldCollections') {
+                        $scopFieldCollectionsFilters[] = $filter;
+                        unset($filters[$key]);
+                    }
+                }
+            }
+            $requestParams['filter'] = json_encode(array_values($filters));
+            if (!empty($scopFieldCollectionsFilters)) {
+                foreach ($scopFieldCollectionsFilters as $scopFieldCollectionFilter) {
+                    $fieldCollectionType = $scopFieldCollectionFilter['value']['type'];
+                    $fieldCollectionClassField = $scopFieldCollectionFilter['property'];
+                    $fieldCollectionField = $scopFieldCollectionFilter['value']['field'];
+                    $fieldCollectionValue = $scopFieldCollectionFilter['value']['value'];
+                    $operator = strtolower($scopFieldCollectionFilter['operator']);
+                    $alias = "`$fieldCollectionType~$fieldCollectionClassField`";
+                    $aliasId = "$alias.id";
+                    if (str_ends_with($fieldCollectionType,'_localized')) {
+                        $aliasId = "$alias.ooo_id";
+                        $list->onCreateQueryBuilder(
+                            function (\Doctrine\DBAL\Query\QueryBuilder $queryBuilder) use ($list, $fieldCollectionType, $fieldCollectionClassField, $alias, $aliasId) {
+                                $from = $list->getDao()->getTableName();
+                                $queryBuilder->leftJoin($from, 'object_collection_' . $fieldCollectionType . '_' . $list->getClassId(), $alias,
+                                    "$from.id = $aliasId");
+                            }
+                        );
+                    } else {
+                        $list->addFieldCollection($fieldCollectionType, $fieldCollectionClassField);
+                    }
+
+                    if (empty($fieldCollectionField)) {
+                        $conditionFilters[] = "$aliasId IS NOT NULL";
+                        continue;
+                    }
+
+                    if ($operator === 'like') {
+                        if (empty($fieldCollectionValue)) {
+                            $conditionFilters[] = "$aliasId IS NOT NULL";
+                            $conditionFilters[] = "($alias.$fieldCollectionField IS NULL OR $alias.$fieldCollectionField = '')";
+                            continue;
+                        }
+                        $fieldCollectionValue = $fieldCollectionValue . '%';
+                    } elseif ($operator === 'lt') {
+                        $operator = '<';
+                    } elseif ($operator === 'gt') {
+                        $operator = '>';
+                    } elseif ($operator === 'eq') {
+                        $operator = '=';
+                    } elseif ($operator === 'in' && is_array($fieldCollectionValue)) {
+                        if (empty($fieldCollectionValue)) {
+                            $conditionFilters[] = "$aliasId IS NOT NULL";
+                            $conditionFilters[] = "($alias.$fieldCollectionField IS NULL OR $alias.$fieldCollectionField = '')";
+                            continue;
+                        }
+                        $filterParts = [];
+                        foreach ($fieldCollectionValue as $oneValue) {
+                            $filterParts[] = "$alias.$fieldCollectionField = '$oneValue' OR $alias.$fieldCollectionField LIKE '%,$oneValue%' OR $alias.$fieldCollectionField LIKE '%$oneValue,%'";
+                        }
+                        $conditionFilters[] = '(' . implode(' OR ', $filterParts) . ')';
+                        continue;
+                    }
+
+                    $conditionFilters[] = "$alias.$fieldCollectionField $operator '$fieldCollectionValue'";
+                }
+            }
+        }
+        //ScopePatch>>
+
         if (!empty($requestParams['filter'])) {
             $conditionFilters[] = $this->getFilterCondition($requestParams['filter'], $class, $list->getDao()->getTableName());
             $featureAndSlugFilters = $this->getFeatureAndSlugFilters($requestParams['filter'], $class, $requestedLanguage);

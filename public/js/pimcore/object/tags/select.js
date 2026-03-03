@@ -331,6 +331,11 @@ pimcore.object.tags.select = Class.create(pimcore.object.tags.abstract, {
                 options.value = this.data;
             } else {
                 options.value = "";
+                //<<<ScopPatch
+                if (this.data != "" && this.context?.target === 'grid') {
+                    console.error(t("invalid_option", '', {option: this.data, field: this.getName()}));
+                } else
+                //ScopPatch>>>
                 if (this.data != "") {
                     pimcore.helpers.showNotification(
                         t("error"),

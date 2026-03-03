@@ -41,50 +41,100 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         this.toolbar = toolbar;
     },
 
+    //<<<ScopPatch
+    getCellEditValue: function () {
+        return this.getValue();
+    },
+
     getGridColumnConfig: function(field) {
-        return {text: t(field.label), width: 150, sortable: false, dataIndex: field.key,
-                renderer: function (key, value, metaData, record) {
-                    this.applyPermissionStyle(key, value, metaData, record);
-                    if(typeof record.data[key] === 'string') {
-                        return record.data[key];
-                    }
+        return {
+            text: t(field.label),
+            width: 300,
+            sortable: false,
+            dataIndex: field.key,
+            getEditor: this.getWindowCellEditor.bind(this, field),
+            renderer: function (key, value, metaData, record, rowIdex, colIdex, grid, window) {
+                this.applyPermissionStyle(key, value, metaData, record);
+                if (typeof record.data.data === 'undefined') {
+                    record.data.data = Ext.clone(record.data);
+                }
+                if (typeof record.data.general === 'undefined') {
+                    record.data.general = record.data.data;
+                }
+                if (typeof record.data.metaData === "undefined") {
+                    record.data.metaData = metaData;
+                }
 
-                    let preview = '';
-                    let plainText = false;
-                    let fieldCollectionItems = record.data[key];
+                if (!value) {
+                    return '';
+                }
+                field.gridLanguage = grid.config.proxy.extraParams.language;
+                record.getSaveData = () => {
+                    let saveData = {};
+                    saveData.data = {key: record.data.data[key]};
+                    saveData.data = Ext.encode(saveData.data);
+                    return saveData;
+                }
 
-                    if (typeof record.data.preview !== 'undefined'){
-                        fieldCollectionItems = record.data.preview;
-                        plainText = true;
-                    }
 
-                    let previousFieldCollectionItemType = null;
-                    for (let fieldCollectionItem of fieldCollectionItems) {
-
-                        if (plainText) {
-                            preview += this.generatePlainTextPreview(fieldCollectionItem);
-                        } else {
-                            if (previousFieldCollectionItemType !== fieldCollectionItem.type) {
-                                preview += `<h3 style="margin-top: 0">${t(fieldCollectionItem.type)}</h3>`;
-                                previousFieldCollectionItemType = fieldCollectionItem.type;
-                            }
-
-                            preview += `<div style="margin-bottom: 10px; border-bottom: 1px solid #e9e9e9; overflow: auto; white-space: normal">`;
-                            for (let fieldKey in fieldCollectionItem.data) {
-                                if (!fieldCollectionItem.data.hasOwnProperty(fieldKey)) {
-                                    continue;
+                for (let item of value) {
+                    if (typeof item.data !== 'undefined') {
+                        for (let k in item.data) {
+                            if (typeof item.data[k] && typeof item.data[k]?.value !== 'undefined') {
+                                if (!item.titles) {
+                                    item.titles = {};
                                 }
-
-                                preview += `<div style=""><b>${t(fieldCollectionItem.data[fieldKey].title)}:</b></div>`;
-                                preview += `<div style="margin-bottom: 5px">${fieldCollectionItem.data[fieldKey].value ? fieldCollectionItem.data[fieldKey].value : '-'}</div>`;
+                                item.titles[k] = item.data[k]?.title;
+                                let childValue = item.data[k].value;
+                                item.data[k] = childValue;
                             }
-                            preview += `</div>`;
                         }
                     }
+                }
+                record.data.data[key] = value;
+                this.setObject(record);
+                this.updateContext({
+                    objectId: record.id
+                });
 
-                    return preview;
-                }.bind(this, field.key)};
+                let html = '<div class="grid-cell-block"><hr>';
+                for (var i= 0; i < value.length; i++) {
+                    let type = value[i].type;
+                    html += '<h4>' + type + '</h4>';
+                    this.currentData = value[i].data;
+                    let childrenFildDef = [];
+                    if (this.fieldConfig.children) {
+                        for (const childKey in this.fieldConfig.children[type]) {
+                            if (childKey === 'localizedfields') {
+                                for (const locChildKey in this.fieldConfig.children[type][childKey]) {
+                                    if (!this.fieldConfig.children[type][childKey][locChildKey].visibleGridView) {
+                                        continue;
+                                    }
+                                    let name = this.fieldConfig.children[type][childKey][locChildKey].name;
+                                    let plainLabel = value[i].titles[name] ?? name;
+                                    let rawValue = this.currentData[childKey]['data'][field.gridLanguage][name] ?? null;
+                                    html += '<strong>' + plainLabel + '</strong> : ' + rawValue + '<br>';
+                                }
+                            } else {
+                                if (!this.fieldConfig.children[type][childKey].visibleGridView) {
+                                    continue;
+                                }
+                                let name = this.fieldConfig.children[type][childKey].name;
+                                let plainLabel = value[i].titles[name] ?? name;
+                                let rawValue = this.currentData[name] ?? null;
+                                html += '<strong>' + plainLabel + '</strong> : ' + rawValue + '<br>';
+                            }
+                        }
+                    }
+                    html += '<hr>';
+                }
+                html += '</div>';
+                return html;
+            }.bind(this, field.key)
+        };
     },
+    //ScopPatch>>>
+
     generatePlainTextPreview: function (fieldCollectionItem) {
         let preview = `<b>${t(fieldCollectionItem.type)}</b> - `;
         for (let fieldKey in fieldCollectionItem.data) {
@@ -466,6 +516,9 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 containerKey: type,
                 index: index,
                 applyDefaults: !ignoreChange,
+                //<<<ScopPatch
+                gridLanguage: this.context?.gridLanguage ?? null,
+                //ScopPatch>>>
             },
             false,
             false,
@@ -644,7 +697,38 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         }
 
         return false;
+    },
+
+    //<<ScopePatch
+    getGridColumnFilter: function(field) {
+        let fcs = field.layout?.children;
+        let fcsData = [];
+        if (fcs) {
+            for (const fcsKey in fcs) {
+                fcsData.push({'label': fcsKey, 'key': fcsKey});
+                if (fcs[fcsKey].localizedfields) {
+                    for (const locFieldKey in fcs[fcsKey].localizedfields) {
+                        fcs[fcsKey].localizedfields[locFieldKey].localized = true;
+                    }
+                    Ext.merge(fcs[fcsKey], fcs[fcsKey].localizedfields);
+                    delete fcs[fcsKey].localizedfields;
+                }
+            }
+        }
+        var fcStore = Ext.create('Ext.data.JsonStore', {
+            fields: ['key', "label"],
+            data: fcsData
+        });
+
+        return {
+            type: 'scopFieldCollections',
+            dataIndex: field.key,
+            typeStore: fcStore,
+            fcs: fcs
+        };
+
     }
+    //ScopePatch>>
 });
 
 pimcore.object.tags.fieldcollections.addMethods(pimcore.object.helpers.edit);

@@ -966,6 +966,10 @@ class ClassController extends AdminAbstractController implements KernelControlle
         $layoutDefinitions = isset($filteredDefinitions['layoutDefinition']) ? $filteredDefinitions['layoutDefinition'] : false;
         $filteredFieldDefinition = isset($filteredDefinitions['fieldDefinition']) ? $filteredDefinitions['fieldDefinition'] : false;
 
+        //<<<ScopPatch
+        $this->addFieldCollectionDefinitions($layoutDefinitions);
+        //ScopPatch>>>
+
         $class->setFieldDefinitions([]);
 
         $result = [];
@@ -1022,6 +1026,43 @@ class ClassController extends AdminAbstractController implements KernelControlle
 
         return $this->adminJson($result);
     }
+
+    //<<<ScopPatch
+    private function addFieldCollectionDefinitions(DataObject\ClassDefinition\Layout $layout): void
+    {
+        foreach ($layout->getChildren() as $child) {
+            if ($child instanceof DataObject\ClassDefinition\Data\Fieldcollections) {
+                $field = $child;
+
+                foreach ($field->getAllowedTypes() as $fcType) {
+                    $collectionDef = DataObject\Fieldcollection\Definition::getByKey($fcType);
+                    $childrenDef = $collectionDef->getFieldDefinitions();
+                    $localizedFields = $childrenDef['localizedfields'] ?? null;
+                    unset($childrenDef['localizedfields']);
+                    $children = array_values(array_map(static function($child) {
+                        $data = get_object_vars($child);
+                        $data['fieldtype'] = $child->getFieldType();
+                        $data['datatype'] = 'data';
+                        return $data;
+                    }, $childrenDef));
+                    if ($localizedFields !== null) {
+                        $children['localizedfields'] = array_values(array_map(static function($child) {
+                            $data = get_object_vars($child);
+                            $data['fieldtype'] = $child->getFieldType();
+                            $data['datatype'] = 'data';
+                            return $data;
+                        }, $localizedFields->getChildren()));
+                    }
+                    $field->children[$fcType] = $children;
+                }
+                continue;
+            }
+            if ($child instanceof DataObject\ClassDefinition\Layout) {
+                $this->addFieldCollectionDefinitions($child);
+            }
+        }
+    }
+    //ScopPatch>>>
 
     /**
      * OBJECT BRICKS
