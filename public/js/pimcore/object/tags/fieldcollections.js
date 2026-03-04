@@ -55,9 +55,6 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
             getEditor: this.getWindowCellEditor.bind(this, field),
             renderer: function (key, value, metaData, record, rowIdex, colIdex, grid, window) {
                 this.applyPermissionStyle(key, value, metaData, record);
-                // clone fieldCollectionItems to use core preview with plaintext function
-                let fieldCollectionItems = Ext.clone(record.data[key]);
-
                 if (typeof record.data.data === 'undefined') {
                     record.data.data = Ext.clone(record.data);
                 }
@@ -100,52 +97,39 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                     objectId: record.id
                 });
 
-                // core preview
-                let preview = '<hr>';
-                let plainText = false;
-
-
-                if (typeof record.data.preview !== 'undefined'){
-                    fieldCollectionItems = record.data.preview;
-                    plainText = true;
-                }
-
-                let previousFieldCollectionItemType = null;
-                for (let fieldCollectionItem of fieldCollectionItems) {
-                    if (plainText) {
-                        preview += this.generatePlainTextPreview(fieldCollectionItem);
-                    } else {
-                        if (previousFieldCollectionItemType !== fieldCollectionItem.type) {
-                            preview += `<h3 style="margin-top: 0">${t(fieldCollectionItem.type)}</h3>`;
-                            previousFieldCollectionItemType = fieldCollectionItem.type;
-                        }
-
-                        let itemPreview = '';
-                        for (let fieldKey in fieldCollectionItem.data) {
-                            if (!fieldCollectionItem.data.hasOwnProperty(fieldKey)) {
-                                continue;
+                let html = '<div class="grid-cell-block"><hr>';
+                for (var i= 0; i < value.length; i++) {
+                    let type = value[i].type;
+                    html += '<h4>' + type + '</h4>';
+                    this.currentData = value[i].data;
+                    let childrenFildDef = [];
+                    if (this.fieldConfig.children) {
+                        for (const childKey in this.fieldConfig.children[type]) {
+                            if (childKey === 'localizedfields') {
+                                for (const locChildKey in this.fieldConfig.children[type][childKey]) {
+                                    if (!this.fieldConfig.children[type][childKey][locChildKey].visibleGridView) {
+                                        continue;
+                                    }
+                                    let name = this.fieldConfig.children[type][childKey][locChildKey].name;
+                                    let plainLabel = value[i].titles[name] ?? name;
+                                    let rawValue = this.currentData[childKey]['data'][field.gridLanguage][name] ?? null;
+                                    html += '<strong>' + plainLabel + '</strong> : ' + rawValue + '<br>';
+                                }
+                            } else {
+                                if (!this.fieldConfig.children[type][childKey].visibleGridView) {
+                                    continue;
+                                }
+                                let name = this.fieldConfig.children[type][childKey].name;
+                                let plainLabel = value[i].titles[name] ?? name;
+                                let rawValue = this.formatPreviewValue(this.currentData[name] ?? null, {maxArrayItems: 2});
+                                html += '<strong>' + plainLabel + '</strong> : ' + rawValue + '<br>';
                             }
-
-                            const title = fieldCollectionItem.data[fieldKey].title;
-                            if (typeof title !== 'string' || title.trim() === '') {
-                                continue;
-                            }
-                            const value = this.formatPreviewValue(fieldCollectionItem.data[fieldKey].value, {maxArrayItems: 2});
-                            if (!value) {
-                                continue;
-                            }
-
-                            itemPreview += `<div style=""><strong>${t(title)}:</strong> ${value}</div>`;
-                        }
-                        if (itemPreview) {
-                            preview += `<div style="margin-bottom: 10px; border-bottom: 1px solid #e9e9e9; overflow: auto; white-space: normal">`;
-                            preview += itemPreview;
-                            preview += `</div><hr>`;
                         }
                     }
+                    html += '<hr>';
                 }
-
-                return preview;
+                html += '</div>';
+                return html
             }.bind(this, field.key)
         };
     },
@@ -186,6 +170,7 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
 
         return Ext.util.Format.stripTags(String(value));
     },
+    //ScopPatch>>>
 
     generatePlainTextPreview: function (fieldCollectionItem) {
         let preview = `<b>${t(fieldCollectionItem.type)}</b> - `;
@@ -194,10 +179,9 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 continue;
             }
             preview += `<b>${t(fieldCollectionItem.data[fieldKey].title)}:</b><br>`;
-            const value = this.formatPreviewValue(fieldCollectionItem.data[fieldKey].value);
-            if (value) {
-                preview += value;
-            } else {
+            if (fieldCollectionItem.data[fieldKey].value) {
+                preview += `${Ext.util.Format.stripTags(fieldCollectionItem.data[fieldKey].value)}`;
+            }else{
                 preview += '-';
             }
         }
@@ -205,7 +189,6 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
         return preview;
     },
 
-    //ScopPatch>>>
     loadFieldDefinitions: function () {
 
         var allowedTypes = this.fieldConfig.allowedTypes;

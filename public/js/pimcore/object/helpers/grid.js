@@ -178,28 +178,7 @@ pimcore.object.helpers.grid = Class.create({
             listeners: {
                 "beforeload": function (store) {
                     store.getProxy().abort();
-                },
-                //<<<ScopPatch
-                "write": function (store, operation) {
-                    if (!operation || operation.getAction() !== "update") {
-                        return;
-                    }
-
-                    var hasFieldCollections = Array.isArray(this.fields) && this.fields.some(function (field) {
-                        return field && field.type === "fieldcollections";
-                    });
-                    var isShopwareClass = typeof this.selectedClass === "string" && /^Shopware/.test(this.selectedClass);
-                    if (!hasFieldCollections && !isShopwareClass) {
-                        return;
-                    }
-
-                    // Do not keep optimistic/partial update state in the grid.
-                    // Always render data from a fresh read response.
-                    var page = store.currentPage || 1;
-                    store.removeAll();
-                    store.loadPage(page);
-                }.bind(this)
-                //ScopPatch>>>
+                }
             }
         });
 

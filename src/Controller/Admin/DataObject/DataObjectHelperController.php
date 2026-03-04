@@ -1089,6 +1089,44 @@ class DataObjectHelperController extends AdminAbstractController
             }
             DataObject\Service::enrichLayoutDefinition($field, null, $context);
 
+            //<<<ScopPatch
+            if ($field instanceof DataObject\ClassDefinition\Data\Fieldcollections) {
+                foreach ($field->getAllowedTypes() as $fcType) {
+                    $collectionDef = DataObject\Fieldcollection\Definition::getByKey($fcType);
+                    $childrenDef = $collectionDef->getFieldDefinitions(['subContainerName' => $field->getName()]);
+                    $localizedFields = $childrenDef['localizedfields'] ?? null;
+                    unset($childrenDef['localizedfields']);
+                    $children = array_values(array_map(static function($child) {
+                        $data = get_object_vars($child);
+                        $data['fieldtype'] = $child instanceof DataObject\ClassDefinition\Data ? $child->getFieldType() : '';
+                        $data['datatype'] = $child instanceof DataObject\ClassDefinition\Data ? 'data' : 'layout';
+                        $visibleGridView = $data['visibleGridView'] ?? false;
+                        if ($visibleGridView && isset($data['optionsProviderClass']) && $data['optionsProviderClass'] && empty($data['options'])) {
+                            /** @var \Pimcore\Model\DataObject\ClassDefinition\DynamicOptionsProvider\SelectOptionsProviderInterface $provider */
+                            $provider = \Pimcore::getContainer()->get(ltrim($data['optionsProviderClass'], '@'));
+                            $data['options'] = $provider->getOptions([], $child);
+                        }
+                        return $data;
+                    }, $childrenDef));
+                    if ($localizedFields !== null) {
+                        $children['localizedfields'] = array_values(array_map(static function($child) {
+                            $data = get_object_vars($child);
+                            $data['fieldtype'] = $child instanceof DataObject\ClassDefinition\Data ? $child->getFieldType() : '';
+                            $data['datatype'] = $child instanceof DataObject\ClassDefinition\Data ? 'data' : 'layout';
+                            $visibleGridView = $data['visibleGridView'] ?? false;
+                            if ($visibleGridView && isset($data['optionsProviderClass']) && $data['optionsProviderClass'] && empty($data['options'])) {
+                                /** @var \Pimcore\Model\DataObject\ClassDefinition\DynamicOptionsProvider\SelectOptionsProviderInterface $provider */
+                                $provider = \Pimcore::getContainer()->get(ltrim($data['optionsProviderClass'], '@'));
+                                $data['options'] = $provider->getOptions([], $child);
+                            }
+                            return $data;
+                        }, $localizedFields->getChildren()));
+                    }
+                    $field->children[$fcType] = $children;
+                }
+            }
+            //ScopPatch>>>
+
             $result = [
                 'key' => $key,
                 'type' => $field->getFieldType(),
