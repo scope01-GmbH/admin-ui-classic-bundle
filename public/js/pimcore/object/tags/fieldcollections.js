@@ -120,16 +120,28 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                             previousFieldCollectionItemType = fieldCollectionItem.type;
                         }
 
-                        preview += `<div style="margin-bottom: 10px; border-bottom: 1px solid #e9e9e9; overflow: auto; white-space: normal">`;
+                        let itemPreview = '';
                         for (let fieldKey in fieldCollectionItem.data) {
                             if (!fieldCollectionItem.data.hasOwnProperty(fieldKey)) {
                                 continue;
                             }
 
-                            preview += `<div style=""><strong>${t(fieldCollectionItem.data[fieldKey].title)}:</strong> `;
-                            preview += `${fieldCollectionItem.data[fieldKey].value ? fieldCollectionItem.data[fieldKey].value : '-'}</div>`;
+                            const title = fieldCollectionItem.data[fieldKey].title;
+                            if (typeof title !== 'string' || title.trim() === '') {
+                                continue;
+                            }
+                            const value = this.formatPreviewValue(fieldCollectionItem.data[fieldKey].value, {maxArrayItems: 2});
+                            if (!value) {
+                                continue;
+                            }
+
+                            itemPreview += `<div style=""><strong>${t(title)}:</strong> ${value}</div>`;
                         }
-                        preview += `</div><hr>`;
+                        if (itemPreview) {
+                            preview += `<div style="margin-bottom: 10px; border-bottom: 1px solid #e9e9e9; overflow: auto; white-space: normal">`;
+                            preview += itemPreview;
+                            preview += `</div><hr>`;
+                        }
                     }
                 }
 
@@ -137,7 +149,43 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
             }.bind(this, field.key)
         };
     },
-    //ScopPatch>>>
+
+    formatPreviewValue: function (value, options = {}) {
+        if (Array.isArray(value)) {
+            const maxArrayItems = Number.isInteger(options.maxArrayItems) ? options.maxArrayItems : null;
+            const values = maxArrayItems !== null ? value.slice(0, maxArrayItems) : value;
+            const rendered = values.map((item) => this.formatPreviewValue(item, options)).filter((item) => item !== '').join(', ');
+
+            if (maxArrayItems !== null && value.length > maxArrayItems) {
+                return rendered ? `${rendered}, ...` : '...';
+            }
+
+            return rendered;
+        }
+
+        if (value && typeof value === 'object') {
+            if (typeof value.fullpath === 'string' && value.fullpath.length > 0) {
+                return value.fullpath;
+            }
+            if (typeof value.path === 'string' && value.path.length > 0) {
+                return value.path;
+            }
+            if (typeof value.key === 'string' && value.key.length > 0) {
+                return value.key;
+            }
+            if (typeof value.id !== 'undefined') {
+                return String(value.id);
+            }
+
+            return '';
+        }
+
+        if (typeof value === 'undefined' || value === null || value === '') {
+            return '';
+        }
+
+        return Ext.util.Format.stripTags(String(value));
+    },
 
     generatePlainTextPreview: function (fieldCollectionItem) {
         let preview = `<b>${t(fieldCollectionItem.type)}</b> - `;
@@ -146,15 +194,18 @@ pimcore.object.tags.fieldcollections = Class.create(pimcore.object.tags.abstract
                 continue;
             }
             preview += `<b>${t(fieldCollectionItem.data[fieldKey].title)}:</b><br>`;
-            if (fieldCollectionItem.data[fieldKey].value) {
-                preview += `${Ext.util.Format.stripTags(fieldCollectionItem.data[fieldKey].value)}`;
-            }else{
+            const value = this.formatPreviewValue(fieldCollectionItem.data[fieldKey].value);
+            if (value) {
+                preview += value;
+            } else {
                 preview += '-';
             }
         }
 
         return preview;
     },
+
+    //ScopPatch>>>
     loadFieldDefinitions: function () {
 
         var allowedTypes = this.fieldConfig.allowedTypes;
