@@ -682,7 +682,7 @@ pimcore.element.helpers.gridColumnConfig = {
             title: title,
             items: [formPanel],
             bodyStyle: "background: #fff;",
-            width: 700,
+            width: 1200,
             maxHeight: 600
         });
         this.batchWin.show();
